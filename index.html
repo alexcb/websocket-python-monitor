@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+		var ws;
+		var charts = {};
+
+		var options = {
+			hAxis: {
+				title: 'Time'
+			},
+			vAxis: {
+				title: ''
+			},
+			series: {
+				1: {curveType: 'function'}
+			}
+		};
+
+		google.load('visualization', '1', {packages: ['corechart', 'line']});
+		google.setOnLoadCallback(initData);
+
+		function initData() {
+			charts.loadavg = {
+				data: new google.visualization.DataTable(),
+				chart: new google.visualization.LineChart(document.getElementById('chart_load'))
+			};
+			charts.loadavg.data.addColumn('datetime', 'time');
+			charts.loadavg.data.addColumn('number', 'LoadAvg');
+
+			charts.users = {
+				data: new google.visualization.DataTable(),
+				chart: new google.visualization.LineChart(document.getElementById('chart_users'))
+			};
+			charts.users.data.addColumn('datetime', 'time');
+			charts.users.data.addColumn('number', 'users');
+		}
+
+		function openWS() {
+			var web_socket_url = "ws://" + location.hostname + ":8080/metrics"
+			console.log("attempting connection: " + web_socket_url);
+			ws = new WebSocket(web_socket_url);
+			ws.onmessage = function(e) {
+				var new_data = JSON.parse(e.data);
+				console.log("data to add: " + new_data.length);
+				$.each(new_data, function(i, d) {
+					var thetime = new Date(0);
+					thetime.setUTCSeconds(d.time);
+					charts.loadavg.data.addRows([[thetime, d.loadavg]])
+					charts.users.data.addRows([[thetime, d.num_users]])
+				});
+		
+				charts.loadavg.chart.draw(charts.loadavg.data, options);
+				charts.users.chart.draw(charts.users.data, options);
+		
+			};
+			ws.onclose = function(e) {
+				console.log("websocket connection closed, reconnecting");
+				openWS();
+			};
+		}
+
+		//function sendMessage() {
+		//    ws.send(JSON.stringify(data));
+		//}
+		
+		window.onload = function() {
+			if("WebSocket" in window) {
+				openWS();
+			}
+			else {
+				console.log("webbrowser does not support websockets");
+			}
+		}
+    </script>
+  </head>
+  <body>
+
+  <div id="chart_load"></div>
+  <div id="chart_users"></div>
+
+  </body>
+</html>
